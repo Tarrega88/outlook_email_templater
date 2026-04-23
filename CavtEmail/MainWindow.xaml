@@ -1,0 +1,413 @@
+<Window x:Class="CavtEmail.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CavtEmail"
+        xmlns:vm="clr-namespace:CavtEmail.ViewModels"
+        xmlns:m="clr-namespace:CavtEmail.Models"
+        Title="Cavt Email — File-to-Person Sender" Height="780" Width="1240"
+        Background="{StaticResource AppBg}"
+        WindowStartupLocation="CenterScreen">
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+
+    <DockPanel>
+
+        <!-- ======================== Top toolbar ======================== -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource CardBg}"
+                BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1">
+            <Grid Margin="16,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Cavt Email" FontSize="16" FontWeight="Bold"
+                           VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Open…"    Command="{Binding OpenCommand}"   Style="{StaticResource SubtleButton}" Margin="0,0,6,0"/>
+                    <Button Content="Save"     Command="{Binding SaveCommand}"   Style="{StaticResource SubtleButton}" Margin="0,0,6,0"/>
+                    <Button Content="Save As…" Command="{Binding SaveAsCommand}" Style="{StaticResource SubtleButton}" Margin="0,0,14,0"/>
+                    <Button Content="Contacts…" Command="{Binding ManageContactsCommand}" Style="{StaticResource SubtleButton}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Sender" Style="{StaticResource Label}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBox Width="180" Text="{Binding Config.SenderName, UpdateSourceTrigger=PropertyChanged}"
+                             local:TextBoxHelper.Placeholder="Your name"
+                             Margin="0,0,14,0"/>
+
+                    <TextBlock Text="Send mode" Style="{StaticResource Label}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox Width="160" ItemsSource="{Binding SendModes}"
+                              SelectedItem="{Binding Config.SendMode}" Margin="0,0,14,0"/>
+
+                    <CheckBox Content="HTML body" IsChecked="{Binding Config.HtmlBody}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ======================== Status bar ======================== -->
+        <Border DockPanel.Dock="Bottom" Background="{StaticResource CardBg}"
+                BorderBrush="{StaticResource CardBorder}" BorderThickness="0,1,0,0" Padding="16,5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding CurrentConfigPath}"
+                           Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ======================== Main 3-column layout ======================== -->
+        <Grid Margin="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="260"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ========== Left: Groups ========== -->
+            <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Groups" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="+ Add" Style="{StaticResource PrimaryButton}"
+                                Command="{Binding AddGroupCommand}"/>
+                    </Grid>
+
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="Duplicate" Style="{StaticResource SubtleButton}" Margin="0,0,6,0"
+                                Command="{Binding DuplicateGroupCommand}"/>
+                        <Button Content="Remove" Style="{StaticResource SubtleButton}"
+                                Command="{Binding RemoveGroupCommand}"/>
+                    </StackPanel>
+
+                    <ListBox ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="2,3">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding Recipients.Count, StringFormat={}{0} ppl}"
+                                                   FontSize="11" Foreground="{StaticResource Muted}" Margin="0,0,10,0"/>
+                                        <TextBlock Text="{Binding Attachments.Count, StringFormat={}{0} files}"
+                                                   FontSize="11" Foreground="{StaticResource Muted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- ========== Center: Group editor ========== -->
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,8,0">
+                <Grid>
+                    <TextBlock Text="Select or create a group on the left."
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource Muted}" FontSize="14">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasSelection}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <Grid Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}"
+                          DataContext="{Binding SelectedGroup}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>   <!-- name + send mode -->
+                            <RowDefinition Height="Auto"/>   <!-- three columns -->
+                            <RowDefinition Height="Auto"/>   <!-- subject -->
+                            <RowDefinition Height="*"/>      <!-- body -->
+                            <RowDefinition Height="Auto"/>   <!-- footer buttons -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Group name -->
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Group name" Style="{StaticResource Label}"/>
+                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="15" FontWeight="SemiBold"
+                                     local:TextBoxHelper.Placeholder="e.g. Weekly reports for the AV team"/>
+                        </StackPanel>
+
+                        <!-- Recipients / Attachments -->
+                        <Grid Grid.Row="1" Margin="0,0,0,12" Height="240">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- ===== Recipients ===== -->
+                            <Border Style="{StaticResource InnerCard}" Margin="0,0,4,0">
+                                <DockPanel>
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Recipients" Style="{StaticResource SectionTitle}"/>
+                                        <Button Grid.Column="1" Content="+ Add" Style="{StaticResource IconButton}"
+                                                Command="{Binding DataContext.AddRecipientCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                    </Grid>
+                                    <TextBlock DockPanel.Dock="Bottom" Margin="0,6,0,0" Style="{StaticResource Hint}"
+                                               Text="👤 picks a saved contact. To/CC moves to Cc. New pairs are saved on send."/>
+
+                                    <ListBox ItemsSource="{Binding Recipients}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,1">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <ToggleButton Style="{StaticResource CcToggle}"
+                                                                      IsChecked="{Binding IsCc, UpdateSourceTrigger=PropertyChanged}"
+                                                                      Margin="0,0,4,0"/>
+                                                        <Button Grid.Column="1" Content="👤" Style="{StaticResource IconButton}"
+                                                                ToolTip="Pick from contacts" Margin="0,0,4,0"
+                                                                Click="PickContact_Click"/>
+                                                        <TextBox Grid.Column="2" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                 local:TextBoxHelper.Placeholder="Name"/>
+                                                        <TextBox Grid.Column="3" Margin="4,0"
+                                                                 Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                                                                 local:TextBoxHelper.Placeholder="name@example.com"/>
+                                                        <Button Grid.Column="4" Content="✕" Style="{StaticResource IconButton}"
+                                                                Command="{Binding DataContext.RemoveRecipientCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,3,0,2">
+                                                        <Button Content="Insert ▾" Style="{StaticResource IconButton}"
+                                                                Click="InsertRecipient_MenuClick"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- ===== Attachments ===== -->
+                            <Border Grid.Column="1" Style="{StaticResource InnerCard}" Margin="4,0,0,0"
+                                    AllowDrop="True" Drop="Attachments_Drop" DragOver="Attachments_DragOver">
+                                <DockPanel>
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Attachments" Style="{StaticResource SectionTitle}"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button Content="Browse…" Style="{StaticResource IconButton}" Margin="0,0,4,0"
+                                                    Command="{Binding DataContext.AddAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                            <Button Content="Folder…" Style="{StaticResource IconButton}"
+                                                    ToolTip="Add a folder. Its top-level files are re-scanned every time you send."
+                                                    Command="{Binding DataContext.AddAttachmentFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock DockPanel.Dock="Bottom" Margin="0,6,0,0" Style="{StaticResource Hint}"
+                                               Text="Drag files or folders here. Folders are re-scanned on every send. Subj / Body inserts the filename."/>
+
+                                    <ListBox ItemsSource="{Binding Attachments}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,1">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding DisplayKind}" FontSize="10"
+                                                                           Foreground="{StaticResource Muted}" Margin="0,0,6,0"
+                                                                           VerticalAlignment="Center">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsFolder}" Value="False">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Text="{Binding ResolvedFileCount, StringFormat={} ({0})}" FontSize="10"
+                                                                           Foreground="{StaticResource Muted}" Margin="6,0,0,0" VerticalAlignment="Center">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsFolder}" Value="False">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Path}" FontSize="10"
+                                                                       Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Content="✕" Style="{StaticResource IconButton}"
+                                                                Command="{Binding DataContext.RemoveAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,3,0,2">
+                                                        <Button Content="Subj" Style="{StaticResource IconButton}" Margin="0,0,4,0"
+                                                                Click="InsertAttachment_Click" Tag="Subject"/>
+                                                        <Button Content="Body" Style="{StaticResource IconButton}"
+                                                                Click="InsertAttachment_Click" Tag="Body"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Subject -->
+                        <StackPanel Grid.Row="2" Margin="0,0,0,10">
+                            <TextBlock Text="Subject" Style="{StaticResource Label}"/>
+                            <TextBox Text="{Binding Subject, UpdateSourceTrigger=PropertyChanged}"
+                                     local:TextBoxHelper.Placeholder="Email subject — supports {{tokens}}"
+                                     Name="SubjectBox"/>
+                        </StackPanel>
+
+                        <!-- Body -->
+                        <DockPanel Grid.Row="3">
+                            <TextBlock DockPanel.Dock="Top" Text="Body" Style="{StaticResource Label}"/>
+                            <TextBox Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource MultilineTextBox}"
+                                     local:TextBoxHelper.Placeholder="Type your message. Use {{tokens}} from the right panel, or the Subj/Body buttons to insert people and filenames."
+                                     Name="BodyBox"/>
+                        </DockPanel>
+
+                        <!-- Footer -->
+                        <Grid Grid.Row="4" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="Preview" Style="{StaticResource SubtleButton}" Margin="0,0,8,0"
+                                        Command="{Binding DataContext.PreviewCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <Button Content="Send all groups" Style="{StaticResource SubtleButton}" Margin="0,0,8,0"
+                                        Command="{Binding DataContext.SendAllCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                <Button Content="Send via Outlook" Style="{StaticResource PrimaryButton}"
+                                        Command="{Binding DataContext.SendCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- ========== Right: Tokens reference ========== -->
+            <Border Grid.Column="2" Style="{StaticResource Card}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Tokens" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
+
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <TextBlock Text="Insert into" Style="{StaticResource Label}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="TokenTargetBody" Content="Body" IsChecked="True"
+                                         GroupName="TokenTarget" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <RadioButton x:Name="TokenTargetSubject" Content="Subject"
+                                         GroupName="TokenTarget" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,0,0,8"
+                               Text="Click a token to insert it into the selected field."/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Recipients" Style="{StaticResource Label}"/>
+                            <WrapPanel Margin="0,0,0,6">
+                                <Button Content="{}{{recipients}}"       Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{recipientEmails}}"  Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{recipientCount}}"   Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{greetRecipients}}"  Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{cc}}"               Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{ccEmails}}"         Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                            </WrapPanel>
+
+                            <TextBlock Text="Files" Style="{StaticResource Label}"/>
+                            <WrapPanel Margin="0,0,0,6">
+                                <Button Content="{}{{files}}"            Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{fileList}}"         Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{fileCount}}"        Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                            </WrapPanel>
+
+                            <TextBlock Text="Context" Style="{StaticResource Label}"/>
+                            <WrapPanel>
+                                <Button Content="{}{{sender}}"           Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{group}}"            Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{date}}"             Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{time}}"             Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Floating contact picker (zero-size until opened by PickContact_Click) -->
+            <Popup x:Name="ContactPicker" StaysOpen="False" Placement="Bottom"
+                   AllowsTransparency="True" PopupAnimation="Fade">
+                <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBorder}"
+                        BorderThickness="1" CornerRadius="6" Padding="8" Width="320">
+                    <DockPanel>
+                        <TextBox x:Name="ContactPickerSearch" DockPanel.Dock="Top" Margin="0,0,0,6"
+                                 local:TextBoxHelper.Placeholder="Search contacts by name or email…"
+                                 TextChanged="ContactPickerSearch_TextChanged"
+                                 PreviewKeyDown="ContactPickerSearch_KeyDown"/>
+                        <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource Hint}" Margin="0,6,0,0"
+                                   Text="Click a contact to fill this row. Esc to cancel."/>
+                        <ListBox x:Name="ContactPickerList" MaxHeight="260"
+                                 MouseDoubleClick="ContactPickerCommit"
+                                 KeyDown="ContactPickerList_KeyDown">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="2,2">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Email}" Foreground="{StaticResource Muted}" FontSize="11"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+            </Popup>
+        </Grid>
+
+    </DockPanel>
+</Window>

@@ -1,0 +1,148 @@
+# ---------------------------------------------------------------------------
+# .NET / Visual Studio / Rider / VS Code .gitignore for the CavtEmail repo
+# Based on the standard GitHub "VisualStudio.gitignore" with project-specific
+# additions (WPF wpftmp files, local config, etc.).
+# ---------------------------------------------------------------------------
+
+## ---- Build results ----
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Oo]ut/
+[Pp]ublish/
+artifacts/
+
+## ---- Visual Studio ----
+.vs/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## ---- MSBuild / build logs ----
+*.binlog
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+## ---- ReSharper / Rider ----
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+.idea/
+
+## ---- VS Code ----
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## ---- Roslyn cache / StyleCop ----
+*.sln.iml
+*.ide/
+.vshistory/
+
+## ---- Test / coverage ----
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+
+## ---- NuGet ----
+*.nupkg
+*.snupkg
+.nuget/
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+*.nuget.dgspec.json
+
+## ---- .NET Core / SDK ----
+project.assets.json
+*.cache
+*.tlog
+*.lastcodeanalysissucceeded
+*.vspscc
+*.vssscc
+.builds
+
+## ---- WPF intermediate ----
+# wpftmp files are produced by the XAML compiler for design-time builds.
+*_wpftmp.*
+*.baml
+*.g.cs
+*.g.i.cs
+*.g.resources
+*.lref
+
+## ---- Build outputs we don't want tracked ----
+*.dll
+*.pdb
+*.exe
+*.exe.config
+*.deps.json
+*.runtimeconfig.json
+*.runtimeconfig.dev.json
+apphost.exe
+
+## ---- Publish / deploy ----
+PublishScripts/
+*.[Pp]ublish.xml
+*.azurePubxml
+*.pubxml
+*.publishproj
+
+## ---- ClickOnce ----
+publish/
+
+## ---- Installers / installers output ----
+*.msi
+*.msm
+*.mst
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+
+## ---- Office / misc caches ----
+~$*
+*~
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+Thumbs.db
+Desktop.ini
+
+## ---- Node (if ever added) ----
+node_modules/
+
+## ---- Project-specific ----
+# Local user config for the app (sender name, groups, contacts). Uncomment
+# if you don't want to commit a sample config.
+# CavtEmail/config.json
+# *.cavtemail.json
