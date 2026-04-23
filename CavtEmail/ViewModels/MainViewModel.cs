@@ -19,6 +19,10 @@ public class MainViewModel : NotifyBase
         _currentConfigPath = ConfigService.DefaultPath;
         _config = ConfigService.Load(_currentConfigPath);
 
+        // Contacts live in a shared file independent of whatever config is open.
+        _config.Contacts = ContactsService.Load();
+        MigrateLegacyContacts(_config);
+
         if (_config.Groups.Count == 0)
         {
             _config.Groups.Add(new EmailGroup { Name = "Group 1" });
@@ -92,20 +96,35 @@ public class MainViewModel : NotifyBase
     /// <summary>Add any recipient (name,email) pair that isn't already in the contact book.</summary>
     public void CaptureContactsFrom(EmailGroup g)
     {
-        foreach (var r in g.Recipients)
-        {
-            if (string.IsNullOrWhiteSpace(r.Email)) continue;
-            if (_config.Contacts.Any(c =>
-                    string.Equals(c.Email, r.Email, StringComparison.OrdinalIgnoreCase)))
-                continue;
-            _config.Contacts.Add(new Contact { Name = r.Name, Email = r.Email });
-        }
+        var added = ContactsService.Merge(_config.Contacts,
+            g.Recipients.Select(r => new Contact { Name = r.Name, Email = r.Email }));
+        if (added > 0) SaveContacts();
+    }
+
+    /// <summary>Persist the shared contacts file. Safe to call freely.</summary>
+    public void SaveContacts()
+    {
+        try { ContactsService.Save(_config.Contacts); }
+        catch (Exception ex) { StatusMessage = "Contacts save failed: " + ex.Message; }
+    }
+
+    /// <summary>
+    /// If an opened config carried an embedded "Contacts" array (old format),
+    /// fold those entries into the shared store and persist.
+    /// </summary>
+    private void MigrateLegacyContacts(AppConfig cfg)
+    {
+        if (cfg.LegacyContacts == null || cfg.LegacyContacts.Count == 0) return;
+        var added = ContactsService.Merge(cfg.Contacts, cfg.LegacyContacts);
+        cfg.LegacyContacts = null;
+        if (added > 0) SaveContacts();
     }
 
     private void ManageContacts()
     {
         var win = new ContactsWindow(_config.Contacts) { Owner = Application.Current.MainWindow };
         win.ShowDialog();
+        SaveContacts();
     }
 
     private void AddGroup()
@@ -233,6 +252,9 @@ public class MainViewModel : NotifyBase
             try
             {
                 var cfg = ConfigService.Load(dlg.FileName);
+                // Preserve the shared contacts list across the swap.
+                cfg.Contacts = _config.Contacts;
+                MigrateLegacyContacts(cfg);
                 Config = cfg;
                 CurrentConfigPath = dlg.FileName;
                 SelectedGroup = cfg.Groups.FirstOrDefault();

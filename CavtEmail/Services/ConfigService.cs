@@ -9,7 +9,8 @@ public static class ConfigService
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
     public static string DefaultPath

@@ -142,5 +142,20 @@ public class AppConfig : NotifyBase
     public bool HtmlBody { get => _htmlBody; set => Set(ref _htmlBody, value); }
 
     public ObservableCollection<EmailGroup> Groups { get; set; } = new();
+
+    /// <summary>
+    /// In-memory contact book, shared across all configs via <c>ContactsService</c>.
+    /// Not serialized into per-config JSON files — contacts live in their own
+    /// file so opening a different config doesn't wipe or duplicate them.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public ObservableCollection<Contact> Contacts { get; set; } = new();
+
+    /// <summary>
+    /// Legacy slot: older config files embedded contacts under "Contacts". We
+    /// deserialize those into here and migrate them into the shared store on load.
+    /// Set to <c>null</c> after migration so it's omitted from re-saved files.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("Contacts")]
+    public List<Contact>? LegacyContacts { get; set; }
 }
