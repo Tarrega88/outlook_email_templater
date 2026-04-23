@@ -1,4 +1,4 @@
-# Cavt Email
+# Outlook Email Templater
 
 A Windows (WPF, .NET 8) app for organizing "file → person" email sends through classic Outlook.
 
