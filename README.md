@@ -11,7 +11,7 @@ You define any number of **groups**. Each group has:
 - Optional group-local variables
 - A send mode (use global default, open draft in Outlook, or send automatically)
 
-Hit **Send via Outlook** and Cavt Email will either pop the draft open in classic Outlook for review, or send it automatically (with a confirmation prompt).
+Hit **Send via Outlook** and Envoy will either pop the draft open in classic Outlook for review, or send it automatically (with a confirmation prompt).
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Hit **Send via Outlook** and Cavt Email will either pop the draft open in classi
 
 ```powershell
 dotnet build
-dotnet run --project CavtEmail
+dotnet run --project Envoy
 ```
 
 ## Publish (for distribution to coworkers)
@@ -37,8 +37,8 @@ noticeable delay. A plain folder launches instantly.
 ```
 
 Output:
-- Folder: `publish\CavtEmail-win-x64\` — ship the whole folder; `CavtEmail.exe` is the entry point.
-- Zip:    `publish\CavtEmail-win-x64.zip` — same content, for handing out.
+- Folder: `publish\Envoy-win-x64\` — ship the whole folder; `Envoy.exe` is the entry point.
+- Zip:    `publish\Envoy-win-x64.zip` — same content, for handing out.
 
 Pass `-NoZip` to skip the zip step.
 
@@ -69,7 +69,7 @@ Put these anywhere in the **Subject** or **Body**:
 Your groups, recipients, attachments, and variables are saved as JSON. The default location is:
 
 ```
-%APPDATA%\CavtEmail\config.json
+%APPDATA%\Envoy\config.json
 ```
 
 Use **Save As…** to keep named configurations (e.g., one per workflow), and **Open…** to load one.

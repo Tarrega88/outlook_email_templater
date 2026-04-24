@@ -1,5 +1,5 @@
-# Publishes CavtEmail as a multi-file self-contained Windows x64 app.
-# Output: ..\publish\CavtEmail-win-x64  (also zipped alongside).
+# Publishes Envoy as a multi-file self-contained Windows x64 app.
+# Output: ..\publish\Envoy-win-x64  (also zipped alongside).
 #
 # Multi-file on purpose: avoids the first-run extraction delay that
 # PublishSingleFile imposes on every new machine.
@@ -10,8 +10,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo  = Split-Path -Parent $PSScriptRoot
-$proj  = Join-Path $repo 'CavtEmail\CavtEmail.csproj'
-$out   = Join-Path $repo 'publish\CavtEmail-win-x64'
+$proj  = Join-Path $repo 'Envoy\Envoy.csproj'
+$out   = Join-Path $repo 'publish\Envoy-win-x64'
 $zip   = "$out.zip"
 
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }

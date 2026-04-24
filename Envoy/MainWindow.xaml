@@ -1,10 +1,10 @@
-<Window x:Class="CavtEmail.MainWindow"
+<Window x:Class="Envoy.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:CavtEmail"
-        xmlns:vm="clr-namespace:CavtEmail.ViewModels"
-        xmlns:m="clr-namespace:CavtEmail.Models"
-        Title="Cavt Email — File-to-Person Sender" Height="780" Width="1240"
+        xmlns:local="clr-namespace:Envoy"
+        xmlns:vm="clr-namespace:Envoy.ViewModels"
+        xmlns:m="clr-namespace:Envoy.Models"
+        Title="Envoy — File-to-Person Sender" Height="780" Width="1240"
         Background="{StaticResource AppBg}"
         WindowStartupLocation="CenterScreen">
     <Window.DataContext>
@@ -38,27 +38,38 @@
 
     <DockPanel>
 
+        <!-- ======================== Menu bar ======================== -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Open…"    Command="{Binding OpenCommand}"/>
+                <MenuItem Header="_Save"     Command="{Binding SaveCommand}"/>
+                <MenuItem Header="Save _As…" Command="{Binding SaveAsCommand}"/>
+                <Separator/>
+                <MenuItem Header="E_xit" Click="ExitMenu_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Contacts">
+                <MenuItem Header="_Re-verify with Outlook"   Command="{Binding ReVerifyContactsCommand}"
+                          ToolTip="Re-check every saved contact against the Outlook address book and update their verified status."/>
+                <Separator/>
+                <MenuItem Header="_Clear all contacts…"      Command="{Binding ClearContactsCommand}"
+                          ToolTip="Permanently delete every saved contact from local storage."/>
+            </MenuItem>
+        </Menu>
+
         <!-- ======================== Top toolbar ======================== -->
         <Border DockPanel.Dock="Top" Background="{StaticResource CardBg}"
                 BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1">
             <Grid Margin="16,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Cavt Email" FontSize="16" FontWeight="Bold"
+                <TextBlock Text="Envoy" FontSize="16" FontWeight="Bold"
                            VerticalAlignment="Center" Margin="0,0,20,0"/>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="Open…"    Command="{Binding OpenCommand}"   Style="{StaticResource SubtleButton}" Margin="0,0,6,0"/>
-                    <Button Content="Save"     Command="{Binding SaveCommand}"   Style="{StaticResource SubtleButton}" Margin="0,0,6,0"/>
-                    <Button Content="Save As…" Command="{Binding SaveAsCommand}" Style="{StaticResource SubtleButton}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- Outlook availability indicator: no COM launch; just reflects whether OUTLOOK.EXE is running. -->
                     <Border Margin="0,0,14,0" Padding="8,3" CornerRadius="10" VerticalAlignment="Center"
                             ToolTip="Resolving names requires classic Outlook to be running.">

@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows;
 
-namespace CavtEmail;
+namespace Envoy;
 
 public partial class AddContactDialog : Window
 {

@@ -1,9 +1,9 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using CavtEmail.Models;
+using Envoy.Models;
 
-namespace CavtEmail.Services;
+namespace Envoy.Services;
 
 public static class ConfigService
 {
@@ -16,12 +16,7 @@ public static class ConfigService
 
     public static string DefaultPath
     {
-        get
-        {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CavtEmail");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "config.json");
-        }
+        get => Path.Combine(AppDataPaths.Dir, "config.json");
     }
 
     public static AppConfig Load(string path)

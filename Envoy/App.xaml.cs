@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace CavtEmail;
+namespace Envoy;
 
 public partial class App : Application
 {

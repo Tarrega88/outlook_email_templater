@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace CavtEmail.Models;
+namespace Envoy.Models;
 
 public abstract class NotifyBase : INotifyPropertyChanged
 {

@@ -1,6 +1,6 @@
 using System.Windows.Input;
 
-namespace CavtEmail;
+namespace Envoy;
 
 public class RelayCommand : ICommand
 {

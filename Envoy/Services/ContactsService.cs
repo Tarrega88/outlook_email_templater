@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
-using CavtEmail.Models;
+using Envoy.Models;
 
-namespace CavtEmail.Services;
+namespace Envoy.Services;
 
 /// <summary>
 /// Contacts are stored in their own file (shared across every config the user
@@ -19,14 +19,7 @@ public static class ContactsService
 
     public static string DefaultPath
     {
-        get
-        {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "CavtEmail");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "contacts.json");
-        }
+        get => Path.Combine(AppDataPaths.Dir, "contacts.json");
     }
 
     public static ObservableCollection<Contact> Load()

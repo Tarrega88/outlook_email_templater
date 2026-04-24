@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace CavtEmail;
+namespace Envoy;
 
 /// <summary>
 /// Attached property used by the TextBox style to render placeholder text when empty.

@@ -5,11 +5,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
-using CavtEmail.Models;
-using CavtEmail.Services;
-using CavtEmail.ViewModels;
+using Envoy.Models;
+using Envoy.Services;
+using Envoy.ViewModels;
 
-namespace CavtEmail;
+namespace Envoy;
 
 public partial class MainWindow : Window
 {
@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     }
 
     private MainViewModel VM => (MainViewModel)DataContext;
+
+    private void ExitMenu_Click(object sender, RoutedEventArgs e) => Close();
 
     // ------------------------------------------------------------------
     // Attachments drag-and-drop

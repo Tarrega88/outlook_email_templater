@@ -5,8 +5,8 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>CavtEmail</RootNamespace>
-    <AssemblyName>CavtEmail</AssemblyName>
+    <RootNamespace>Envoy</RootNamespace>
+    <AssemblyName>Envoy</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 </Project>

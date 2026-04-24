@@ -1,7 +1,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace CavtEmail.Services;
+namespace Envoy.Services;
 
 /// <summary>
 /// Late-bound Outlook automation. Avoids any compile-time reference to the Outlook

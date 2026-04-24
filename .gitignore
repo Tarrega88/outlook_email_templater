@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# .NET / Visual Studio / Rider / VS Code .gitignore for the CavtEmail repo
+# .NET / Visual Studio / Rider / VS Code .gitignore for the Envoy repo
 # Based on the standard GitHub "VisualStudio.gitignore" with project-specific
 # additions (WPF wpftmp files, local config, etc.).
 # ---------------------------------------------------------------------------
@@ -144,5 +144,5 @@ node_modules/
 ## ---- Project-specific ----
 # Local user config for the app (sender name, groups, contacts). Uncomment
 # if you don't want to commit a sample config.
-# CavtEmail/config.json
-# *.cavtemail.json
+# Envoy/config.json
+# *.Envoy.json

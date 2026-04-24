@@ -2,11 +2,11 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
-using CavtEmail.Models;
-using CavtEmail.Services;
+using Envoy.Models;
+using Envoy.Services;
 using Microsoft.Win32;
 
-namespace CavtEmail.ViewModels;
+namespace Envoy.ViewModels;
 
 public class MainViewModel : NotifyBase
 {
@@ -63,6 +63,9 @@ public class MainViewModel : NotifyBase
         SendAllCommand           = new RelayCommand(SendAll, () => _config.Emails.Count > 0);
         PreviewCommand           = new RelayCommand(Preview, () => SelectedEmail != null);
 
+        ReVerifyContactsCommand  = new RelayCommand(ReVerifyContacts, () => _config.Contacts.Count > 0);
+        ClearContactsCommand     = new RelayCommand(ClearContacts,    () => _config.Contacts.Count > 0);
+
         // Poll Outlook availability for the toolbar indicator. Cheap (process list),
         // no COM launch. 3s interval keeps the indicator responsive without churn.
         IsOutlookAvailable = ContactResolver.IsOutlookRunning();
@@ -103,6 +106,8 @@ public class MainViewModel : NotifyBase
     public RelayCommand OpenCommand { get; }
     public RelayCommand SendCommand { get; }
     public RelayCommand SendAllCommand { get; }
+    public RelayCommand ReVerifyContactsCommand { get; }
+    public RelayCommand ClearContactsCommand { get; }
     public RelayCommand PreviewCommand { get; }
 
     public bool IsOutlookAvailable
@@ -183,6 +188,50 @@ public class MainViewModel : NotifyBase
         var added = ContactsService.Merge(cfg.Contacts, cfg.LegacyContacts);
         cfg.LegacyContacts = null;
         if (added > 0) SaveContacts();
+    }
+
+    // --------------------------------------------------------------
+    // Contacts menu actions
+    // --------------------------------------------------------------
+
+    private void ClearContacts()
+    {
+        var count = _config.Contacts.Count;
+        if (count == 0) return;
+
+        var result = MessageBox.Show(
+            $"Permanently delete all {count} saved contact{(count == 1 ? "" : "s")}?\r\n\r\n" +
+            "This cannot be undone. Contacts you've added manually will be lost; " +
+            "Outlook address book entries will be re-discovered the next time you type them.",
+            "Clear all contacts",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        Resolver.ClearAll();
+        SaveContacts();
+        StatusMessage = $"Cleared {count} contact{(count == 1 ? "" : "s")}.";
+    }
+
+    private void ReVerifyContacts()
+    {
+        if (!ContactResolver.IsOutlookRunning())
+        {
+            MessageBox.Show(
+                "Classic Outlook must be running to re-verify contacts against the address book.",
+                "Outlook not running", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        StatusMessage = "Re-verifying contacts against Outlook…";
+        var report = Resolver.ReVerifyAgainstOutlook();
+        SaveContacts();
+
+        StatusMessage =
+            $"Re-verified {report.Checked} contact{(report.Checked == 1 ? "" : "s")}: " +
+            $"{report.Promoted} newly verified, {report.Demoted} no longer in Outlook, {report.Unchanged} unchanged.";
     }
 
     private void AddEmail()

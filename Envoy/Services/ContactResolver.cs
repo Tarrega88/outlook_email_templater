@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using CavtEmail.Models;
+using Envoy.Models;
 
-namespace CavtEmail.Services;
+namespace Envoy.Services;
 
 /// <summary>
 /// Outcome of resolving a typed recipient string.
@@ -298,6 +298,71 @@ public class ContactResolver
                 c.Name = gal.Contact.Name;
             _onChanged();
         }
+    }
+
+    /// <summary>Summary of a bulk re-verification pass.</summary>
+    public sealed class ReVerifyReport
+    {
+        public int Checked { get; init; }
+        public int Promoted { get; init; }   // now FoundInOutlook=true (was false)
+        public int Demoted { get; init; }    // now FoundInOutlook=false (was true; GAL no longer knows them)
+        public int Unchanged { get; init; }
+        public bool OutlookAvailable { get; init; }
+    }
+
+    /// <summary>
+    /// Walk every contact and re-check against the Outlook address book.
+    /// Updates <see cref="Contact.FoundInOutlook"/> both directions and refreshes
+    /// the display name when Outlook has a better one. Skips contacts with no email.
+    /// </summary>
+    public ReVerifyReport ReVerifyAgainstOutlook()
+    {
+        _outlookUpgradeTried.Clear();
+
+        if (!IsOutlookRunning())
+            return new ReVerifyReport { OutlookAvailable = false };
+
+        int checkedCount = 0, promoted = 0, demoted = 0, unchanged = 0;
+        foreach (var c in _contacts)
+        {
+            if (string.IsNullOrWhiteSpace(c.Email)) continue;
+            checkedCount++;
+
+            var gal = TryOutlookResolve(c.Email);
+            bool foundNow = gal.Outcome == ResolveOutcome.Resolved && gal.Contact != null;
+            bool wasFound = c.FoundInOutlook;
+
+            if (foundNow)
+            {
+                if (!wasFound) promoted++; else unchanged++;
+                c.FoundInOutlook = true;
+                if (gal.Contact is { Name: var n } && !string.IsNullOrWhiteSpace(n) && c.Name != n)
+                    c.Name = n!;
+            }
+            else
+            {
+                if (wasFound) { c.FoundInOutlook = false; demoted++; }
+                else unchanged++;
+            }
+        }
+
+        _onChanged();
+        return new ReVerifyReport
+        {
+            OutlookAvailable = true,
+            Checked = checkedCount,
+            Promoted = promoted,
+            Demoted = demoted,
+            Unchanged = unchanged,
+        };
+    }
+
+    /// <summary>Wipe every contact from memory. Caller is expected to persist.</summary>
+    public void ClearAll()
+    {
+        _contacts.Clear();
+        _outlookUpgradeTried.Clear();
+        _onChanged();
     }
 
     // --------------------------------------------------------------

@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
-using CavtEmail.Models;
+using Envoy.Models;
 
-namespace CavtEmail.Services;
+namespace Envoy.Services;
 
 /// <summary>
 /// Replaces {{var}} tokens in subject/body strings.

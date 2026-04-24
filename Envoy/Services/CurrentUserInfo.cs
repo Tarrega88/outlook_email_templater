@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace CavtEmail.Services;
+namespace Envoy.Services;
 
 /// <summary>
 /// Looks up the current Windows user's display name via Secur32 — works on
