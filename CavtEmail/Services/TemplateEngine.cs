@@ -19,27 +19,27 @@ namespace CavtEmail.Services;
 ///   {{sender}}            global sender name
 ///   {{date}}              today, long format
 ///   {{time}}              current time
-///   {{group}}             group name
+///   {{email}}             this email's template name (alias: {{group}} for older configs)
 /// </summary>
 public static class TemplateEngine
 {
     private static readonly Regex Token = new(@"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}", RegexOptions.Compiled);
 
-    public static string Render(string template, EmailGroup group, AppConfig config)
+    public static string Render(string template, EmailTemplate email, AppConfig config)
     {
         if (string.IsNullOrEmpty(template)) return template ?? "";
 
         return Token.Replace(template, m =>
         {
             var key = m.Groups[1].Value;
-            return Resolve(key, group, config) ?? m.Value;
+            return Resolve(key, email, config) ?? m.Value;
         });
     }
 
-    private static string? Resolve(string key, EmailGroup group, AppConfig config)
+    private static string? Resolve(string key, EmailTemplate email, AppConfig config)
     {
-        var toList = group.Recipients.Where(r => !r.IsCc).ToList();
-        var ccList = group.Recipients.Where(r =>  r.IsCc).ToList();
+        var toList = email.Recipients.Where(r => !r.IsCc).ToList();
+        var ccList = email.Recipients.Where(r =>  r.IsCc).ToList();
 
         switch (key.ToLowerInvariant())
         {
@@ -59,30 +59,31 @@ public static class TemplateEngine
             case "ccemails":
                 return string.Join(", ", ccList.Select(r => r.Email));
             case "files":
-                return string.Join(Environment.NewLine, ResolvedFileNames(group));
+                return string.Join(Environment.NewLine, ResolvedFileNames(email));
             case "filelist":
-                return string.Join(Environment.NewLine, ResolvedFileNames(group).Select(n => " - " + n));
+                return string.Join(Environment.NewLine, ResolvedFileNames(email).Select(n => " - " + n));
             case "filecount":
-                return ResolvedFileNames(group).Count().ToString();
+                return ResolvedFileNames(email).Count().ToString();
             case "sender":
                 return config.SenderName;
             case "date":
                 return DateTime.Now.ToLongDateString();
             case "time":
                 return DateTime.Now.ToShortTimeString();
-            case "group":
-                return group.Name;
+            case "email":
+            case "group": // legacy alias
+                return email.Name;
         }
 
         return null;
     }
 
     /// <summary>
-    /// The file names actually being attached for a group, after expanding folder
+    /// The file names actually being attached for an email, after expanding folder
     /// references to their top-level files.
     /// </summary>
-    private static IEnumerable<string> ResolvedFileNames(EmailGroup group) =>
-        group.Attachments
+    private static IEnumerable<string> ResolvedFileNames(EmailTemplate email) =>
+        email.Attachments
             .SelectMany(a => a.ResolveFiles())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(System.IO.Path.GetFileName)!;

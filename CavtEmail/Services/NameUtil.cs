@@ -1,30 +1,67 @@
 namespace CavtEmail.Services;
 
 using System.Linq;
+using System.Text.RegularExpressions;
 
 /// <summary>
-/// Splits a human name into first / last parts using whitespace.
+/// Splits a human name into first / last parts.
 ///
-/// Rules (per app spec):
-///   FirstName  -> first whitespace-separated token, only if the name has any text.
-///   LastName   -> last whitespace-separated token, only if there are 2+ tokens
-///                 (so "Michael See" yields "See" but "Michael" yields null).
-/// Middle names/initials are treated as part of neither; the last token is the last name.
+/// Handles the two common shapes:
+///   "First Middle Last"            -> First, Last
+///   "Last, First M."               -> First, Last  (Outlook GAL format)
+/// Trailing parentheticals like "(It Concepts, Inc.)" and trailing single-letter
+/// initials with optional periods are stripped.
 /// </summary>
 public static class NameUtil
 {
-    public static string? FirstName(string? fullName)
+    private static readonly Regex Parenthetical = new(@"\s*\([^)]*\)\s*$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Normalize raw display name to "First Last" order, parentheticals removed.
+    /// Returns null when there's nothing usable.
+    /// </summary>
+    private static string? Normalize(string? fullName)
     {
         if (string.IsNullOrWhiteSpace(fullName)) return null;
-        var parts = fullName.Trim().Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length == 0 ? null : parts[0];
+        var s = Parenthetical.Replace(fullName.Trim(), "").Trim();
+        if (s.Length == 0) return null;
+
+        // "Last, First M." -> "First M. Last"
+        var commaIdx = s.IndexOf(',');
+        if (commaIdx > 0)
+        {
+            var last = s[..commaIdx].Trim();
+            var rest = s[(commaIdx + 1)..].Trim();
+            if (last.Length > 0 && rest.Length > 0) s = $"{rest} {last}";
+        }
+        return s;
+    }
+
+    public static string? FirstName(string? fullName)
+    {
+        var s = Normalize(fullName);
+        if (s == null) return null;
+        var parts = s.Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? null : parts[0].TrimEnd('.', ',');
     }
 
     public static string? LastName(string? fullName)
     {
-        if (string.IsNullOrWhiteSpace(fullName)) return null;
-        var parts = fullName.Trim().Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length < 2 ? null : parts[^1];
+        var s = Normalize(fullName);
+        if (s == null) return null;
+        var parts = s.Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries)
+                     .Select(p => p.TrimEnd('.', ','))
+                     .Where(p => p.Length > 0)
+                     .ToArray();
+        if (parts.Length < 2) return null;
+
+        // Drop trailing single-letter initials (e.g., "Michael W" -> "Michael").
+        // We want the actual surname — the last non-initial token.
+        for (int i = parts.Length - 1; i >= 1; i--)
+        {
+            if (parts[i].Length > 1) return parts[i];
+        }
+        return parts[^1];
     }
 
     /// <summary>

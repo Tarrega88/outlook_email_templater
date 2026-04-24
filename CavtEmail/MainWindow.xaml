@@ -11,6 +11,31 @@
         <vm:MainViewModel/>
     </Window.DataContext>
 
+    <Window.Resources>
+        <!-- Right-click menu shared by Subject & Body for inserting tokens at the caret. -->
+        <ContextMenu x:Key="TokenContextMenu" x:Shared="False">
+            <MenuItem Header="Insert recipient">
+                <MenuItem Header="{}{{recipients}}"      Tag="{}{{recipients}}"      Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{recipientEmails}}" Tag="{}{{recipientEmails}}" Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{recipientCount}}"  Tag="{}{{recipientCount}}"  Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{greetRecipients}}" Tag="{}{{greetRecipients}}" Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{cc}}"              Tag="{}{{cc}}"              Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{ccEmails}}"        Tag="{}{{ccEmails}}"        Click="TokenMenu_Click"/>
+            </MenuItem>
+            <MenuItem Header="Insert files">
+                <MenuItem Header="{}{{files}}"     Tag="{}{{files}}"     Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{fileList}}"  Tag="{}{{fileList}}"  Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{fileCount}}" Tag="{}{{fileCount}}" Click="TokenMenu_Click"/>
+            </MenuItem>
+            <MenuItem Header="Insert context">
+                <MenuItem Header="{}{{sender}}" Tag="{}{{sender}}" Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{email}}"  Tag="{}{{email}}"  Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{date}}"   Tag="{}{{date}}"   Click="TokenMenu_Click"/>
+                <MenuItem Header="{}{{time}}"   Tag="{}{{time}}"   Click="TokenMenu_Click"/>
+            </MenuItem>
+        </ContextMenu>
+    </Window.Resources>
+
     <DockPanel>
 
         <!-- ======================== Top toolbar ======================== -->
@@ -30,11 +55,39 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="Open…"    Command="{Binding OpenCommand}"   Style="{StaticResource SubtleButton}" Margin="0,0,6,0"/>
                     <Button Content="Save"     Command="{Binding SaveCommand}"   Style="{StaticResource SubtleButton}" Margin="0,0,6,0"/>
-                    <Button Content="Save As…" Command="{Binding SaveAsCommand}" Style="{StaticResource SubtleButton}" Margin="0,0,14,0"/>
-                    <Button Content="Contacts…" Command="{Binding ManageContactsCommand}" Style="{StaticResource SubtleButton}"/>
+                    <Button Content="Save As…" Command="{Binding SaveAsCommand}" Style="{StaticResource SubtleButton}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Outlook availability indicator: no COM launch; just reflects whether OUTLOOK.EXE is running. -->
+                    <Border Margin="0,0,14,0" Padding="8,3" CornerRadius="10" VerticalAlignment="Center"
+                            ToolTip="Resolving names requires classic Outlook to be running.">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#33EF4444"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsOutlookAvailable}" Value="True">
+                                        <Setter Property="Background" Value="#3322C55E"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock VerticalAlignment="Center" FontSize="11">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="● Outlook offline"/>
+                                    <Setter Property="Foreground" Value="#FFEF4444"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOutlookAvailable}" Value="True">
+                                            <Setter Property="Text" Value="● Outlook"/>
+                                            <Setter Property="Foreground" Value="#FF22C55E"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
+
                     <TextBlock Text="Sender" Style="{StaticResource Label}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBox Width="180" Text="{Binding Config.SenderName, UpdateSourceTrigger=PropertyChanged}"
                              local:TextBoxHelper.Placeholder="Your name"
@@ -71,7 +124,7 @@
                 <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ========== Left: Groups ========== -->
+            <!-- ========== Left: Emails ========== -->
             <Border Style="{StaticResource Card}" Margin="0,0,8,0">
                 <DockPanel>
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
@@ -79,25 +132,25 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Groups" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Emails" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
                         <Button Grid.Column="1" Content="+ Add" Style="{StaticResource PrimaryButton}"
-                                Command="{Binding AddGroupCommand}"/>
+                                Command="{Binding AddEmailCommand}"/>
                     </Grid>
 
                     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
                         <Button Content="Duplicate" Style="{StaticResource SubtleButton}" Margin="0,0,6,0"
-                                Command="{Binding DuplicateGroupCommand}"/>
+                                Command="{Binding DuplicateEmailCommand}"/>
                         <Button Content="Remove" Style="{StaticResource SubtleButton}"
-                                Command="{Binding RemoveGroupCommand}"/>
+                                Command="{Binding RemoveEmailCommand}"/>
                     </StackPanel>
 
-                    <ListBox ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}">
+                    <ListBox ItemsSource="{Binding Emails}" SelectedItem="{Binding SelectedEmail}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Margin="2,3">
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="{Binding Recipients.Count, StringFormat={}{0} ppl}"
+                                        <TextBlock Text="{Binding FilledRecipientCount, StringFormat={}{0} ppl}"
                                                    FontSize="11" Foreground="{StaticResource Muted}" Margin="0,0,10,0"/>
                                         <TextBlock Text="{Binding Attachments.Count, StringFormat={}{0} files}"
                                                    FontSize="11" Foreground="{StaticResource Muted}"/>
@@ -109,10 +162,10 @@
                 </DockPanel>
             </Border>
 
-            <!-- ========== Center: Group editor ========== -->
+            <!-- ========== Center: Email editor ========== -->
             <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,8,0">
                 <Grid>
-                    <TextBlock Text="Select or create a group on the left."
+                    <TextBlock Text="Select or create an email on the left."
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Foreground="{StaticResource Muted}" FontSize="14">
                         <TextBlock.Style>
@@ -128,7 +181,7 @@
                     </TextBlock>
 
                     <Grid Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}"
-                          DataContext="{Binding SelectedGroup}">
+                          DataContext="{Binding SelectedEmail}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- name + send mode -->
                             <RowDefinition Height="Auto"/>   <!-- three columns -->
@@ -137,9 +190,9 @@
                             <RowDefinition Height="Auto"/>   <!-- footer buttons -->
                         </Grid.RowDefinitions>
 
-                        <!-- Group name -->
+                        <!-- Email name -->
                         <StackPanel Margin="0,0,0,12">
-                            <TextBlock Text="Group name" Style="{StaticResource Label}"/>
+                            <TextBlock Text="Email name" Style="{StaticResource Label}"/>
                             <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                      FontSize="15" FontWeight="SemiBold"
                                      local:TextBoxHelper.Placeholder="e.g. Weekly reports for the AV team"/>
@@ -165,43 +218,131 @@
                                                 Command="{Binding DataContext.AddRecipientCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                                     </Grid>
                                     <TextBlock DockPanel.Dock="Bottom" Margin="0,6,0,0" Style="{StaticResource Hint}"
-                                               Text="👤 picks a saved contact. To/CC moves to Cc. New pairs are saved on send."/>
+                                               Text="Type a name, alias, or email. Press Tab or Enter to resolve via Outlook. Drop CC to move a row to Cc."/>
 
-                                    <ListBox ItemsSource="{Binding Recipients}">
+                                    <ListBox ItemsSource="{Binding Recipients}"
+                                             HorizontalContentAlignment="Stretch">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="0,1">
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                    </Grid.RowDefinitions>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <ToggleButton Style="{StaticResource CcToggle}"
-                                                                      IsChecked="{Binding IsCc, UpdateSourceTrigger=PropertyChanged}"
-                                                                      Margin="0,0,4,0"/>
-                                                        <Button Grid.Column="1" Content="👤" Style="{StaticResource IconButton}"
-                                                                ToolTip="Pick from contacts" Margin="0,0,4,0"
-                                                                Click="PickContact_Click"/>
-                                                        <TextBox Grid.Column="2" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                                                 local:TextBoxHelper.Placeholder="Name"/>
-                                                        <TextBox Grid.Column="3" Margin="4,0"
-                                                                 Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
-                                                                 local:TextBoxHelper.Placeholder="name@example.com"/>
-                                                        <Button Grid.Column="4" Content="✕" Style="{StaticResource IconButton}"
-                                                                Command="{Binding DataContext.RemoveRecipientCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                CommandParameter="{Binding}"/>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ToggleButton Style="{StaticResource CcToggle}"
+                                                                  IsChecked="{Binding IsCc, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Margin="0,0,4,0"/>
+
+                                                    <!-- Edit view (TextBox) and resolved view (pill) overlap; visibility swaps by State. -->
+                                                    <Grid Grid.Column="1">
+                                                        <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
+                                                                 local:TextBoxHelper.Placeholder="Name, alias, or email — Tab to resolve"
+                                                                 GotFocus="RecipientBox_GotFocus"
+                                                                 LostFocus="RecipientBox_LostFocus"
+                                                                 TextChanged="RecipientBox_TextChanged"
+                                                                 PreviewKeyDown="RecipientBox_KeyDown">
+                                                            <TextBox.Style>
+                                                                <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsResolved}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsUnresolved}" Value="True">
+                                                                            <Setter Property="BorderBrush" Value="#FFEF4444"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBox.Style>
+                                                        </TextBox>
+                                                        <Button Click="EditRecipient_Click"
+                                                                Visibility="{Binding IsResolved, Converter={StaticResource BoolToVis}}"
+                                                                HorizontalContentAlignment="Left"
+                                                                ToolTip="{Binding Display}">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource RecipientPill}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsFromLocal}" Value="True">
+                                                                            <Setter Property="Background" Value="#331F5E3F"/>
+                                                                            <Setter Property="BorderBrush" Value="#FF22C55E"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsUnverified}" Value="True">
+                                                                            <Setter Property="Background" Value="#33F59E0B"/>
+                                                                            <Setter Property="BorderBrush" Value="#FFF59E0B"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding PillName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                                <TextBlock Text=" — " Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Email}" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Button>
                                                     </Grid>
-                                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,3,0,2">
-                                                        <Button Content="Insert ▾" Style="{StaticResource IconButton}"
-                                                                Click="InsertRecipient_MenuClick"/>
-                                                    </StackPanel>
+
+                                                    <!-- Status glyph. The amber "?" state is clickable (opens Add-to-contacts).
+                                                         Other states are passive; hit-testing is disabled via IsHitTestVisible. -->
+                                                    <Button Grid.Column="2" Margin="6,0" VerticalAlignment="Center"
+                                                            Padding="4,0" MinWidth="20" MinHeight="20"
+                                                            Click="StatusIcon_Click"
+                                                            Background="Transparent" BorderThickness="0"
+                                                            FontSize="14" Cursor="Hand">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="Transparent">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Setter Property="Content" Value=""/>
+                                                                <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+                                                                <Setter Property="ToolTip" Value=""/>
+                                                                <Setter Property="IsHitTestVisible" Value="False"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsResolving}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Setter Property="Content" Value="⟳"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+                                                                        <Setter Property="ToolTip" Value="Resolving…"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsFromOutlook}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Setter Property="Content" Value="Ⓞ"/>
+                                                                        <Setter Property="Foreground" Value="#FF3B82F6"/>
+                                                                        <Setter Property="ToolTip" Value="Originally verified via Outlook"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsFromLocal}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Setter Property="Content" Value="●"/>
+                                                                        <Setter Property="Foreground" Value="#FF22C55E"/>
+                                                                        <Setter Property="ToolTip" Value="Local-only contact (never confirmed by Outlook)"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsUnverified}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Setter Property="Content" Value="?"/>
+                                                                        <Setter Property="Foreground" Value="#FFF59E0B"/>
+                                                                        <Setter Property="ToolTip" Value="Valid email, but not found in Outlook or the local cache. Click to save to contacts."/>
+                                                                        <Setter Property="IsHitTestVisible" Value="True"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsUnresolved}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Setter Property="Content" Value="⚠"/>
+                                                                        <Setter Property="Foreground" Value="#FFEF4444"/>
+                                                                        <Setter Property="ToolTip" Value="Not a known contact and not a valid email address."/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+
+                                                    <Button Grid.Column="3" Content="✕" Style="{StaticResource IconButton}"
+                                                            Command="{Binding DataContext.RemoveRecipientCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"/>
                                                 </Grid>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
@@ -300,6 +441,8 @@
                             <TextBlock Text="Subject" Style="{StaticResource Label}"/>
                             <TextBox Text="{Binding Subject, UpdateSourceTrigger=PropertyChanged}"
                                      local:TextBoxHelper.Placeholder="Email subject — supports {{tokens}}"
+                                     GotFocus="SubjectBody_GotFocus"
+                                     ContextMenu="{StaticResource TokenContextMenu}"
                                      Name="SubjectBox"/>
                         </StackPanel>
 
@@ -309,6 +452,8 @@
                             <TextBox Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource MultilineTextBox}"
                                      local:TextBoxHelper.Placeholder="Type your message. Use {{tokens}} from the right panel, or the Subj/Body buttons to insert people and filenames."
+                                     GotFocus="SubjectBody_GotFocus"
+                                     ContextMenu="{StaticResource TokenContextMenu}"
                                      Name="BodyBox"/>
                         </DockPanel>
 
@@ -321,7 +466,7 @@
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button Content="Preview" Style="{StaticResource SubtleButton}" Margin="0,0,8,0"
                                         Command="{Binding DataContext.PreviewCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                <Button Content="Send all groups" Style="{StaticResource SubtleButton}" Margin="0,0,8,0"
+                                <Button Content="Send all emails" Style="{StaticResource SubtleButton}" Margin="0,0,8,0"
                                         Command="{Binding DataContext.SendAllCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                                 <Button Content="Send via Outlook" Style="{StaticResource PrimaryButton}"
                                         Command="{Binding DataContext.SendCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
@@ -336,18 +481,11 @@
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Tokens" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
 
-                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-                        <TextBlock Text="Insert into" Style="{StaticResource Label}"/>
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="TokenTargetBody" Content="Body" IsChecked="True"
-                                         GroupName="TokenTarget" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <RadioButton x:Name="TokenTargetSubject" Content="Subject"
-                                         GroupName="TokenTarget" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,0,0,8"
-                               Text="Click a token to insert it into the selected field."/>
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,0,0,8">
+                        <Run Text="Click a token to insert it into the last focused field ("/>
+                        <Run x:Name="TokenTargetLabel" Text="Body" FontWeight="SemiBold"/>
+                        <Run Text=")."/>
+                    </TextBlock>
 
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
@@ -371,7 +509,7 @@
                             <TextBlock Text="Context" Style="{StaticResource Label}"/>
                             <WrapPanel>
                                 <Button Content="{}{{sender}}"           Style="{StaticResource TokenPill}" Click="Token_Click"/>
-                                <Button Content="{}{{group}}"            Style="{StaticResource TokenPill}" Click="Token_Click"/>
+                                <Button Content="{}{{email}}"           Style="{StaticResource TokenPill}" Click="Token_Click"/>
                                 <Button Content="{}{{date}}"             Style="{StaticResource TokenPill}" Click="Token_Click"/>
                                 <Button Content="{}{{time}}"             Style="{StaticResource TokenPill}" Click="Token_Click"/>
                             </WrapPanel>
@@ -380,21 +518,39 @@
                 </DockPanel>
             </Border>
 
-            <!-- Floating contact picker (zero-size until opened by PickContact_Click) -->
-            <Popup x:Name="ContactPicker" StaysOpen="False" Placement="Bottom"
+            <!-- Local-cache autocomplete, shown 300ms after user stops typing. -->
+            <Popup x:Name="Autocomplete" StaysOpen="True" Placement="Bottom"
                    AllowsTransparency="True" PopupAnimation="Fade">
                 <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBorder}"
+                        BorderThickness="1" CornerRadius="6" Padding="4" Width="320">
+                    <ListBox x:Name="AutocompleteList" MaxHeight="220"
+                             BorderThickness="0" Background="Transparent"
+                             PreviewMouseLeftButtonUp="AutocompleteList_Click"
+                             PreviewKeyDown="AutocompleteList_KeyDown">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="2,2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Email}" Foreground="{StaticResource Muted}" FontSize="11"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </Popup>
+
+            <!-- Shown when a typed query matches multiple contacts; user picks one. -->
+            <Popup x:Name="AmbiguousPicker" StaysOpen="False" Placement="Bottom"
+                   AllowsTransparency="True" PopupAnimation="Fade">                <Border Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardBorder}"
                         BorderThickness="1" CornerRadius="6" Padding="8" Width="320">
                     <DockPanel>
-                        <TextBox x:Name="ContactPickerSearch" DockPanel.Dock="Top" Margin="0,0,0,6"
-                                 local:TextBoxHelper.Placeholder="Search contacts by name or email…"
-                                 TextChanged="ContactPickerSearch_TextChanged"
-                                 PreviewKeyDown="ContactPickerSearch_KeyDown"/>
+                        <TextBlock DockPanel.Dock="Top" Style="{StaticResource Label}"
+                                   Text="Multiple matches — pick one"/>
                         <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource Hint}" Margin="0,6,0,0"
-                                   Text="Click a contact to fill this row. Esc to cancel."/>
-                        <ListBox x:Name="ContactPickerList" MaxHeight="260"
-                                 MouseDoubleClick="ContactPickerCommit"
-                                 KeyDown="ContactPickerList_KeyDown">
+                                   Text="Enter picks the highlighted row. Esc cancels."/>
+                        <ListBox x:Name="AmbiguousList" MaxHeight="260"
+                                 MouseDoubleClick="AmbiguousCommit_Click"
+                                 PreviewKeyDown="AmbiguousList_KeyDown">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Margin="2,2">

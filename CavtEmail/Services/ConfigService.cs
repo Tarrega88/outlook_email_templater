@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CavtEmail.Models;
 
 namespace CavtEmail.Services;
@@ -29,6 +30,19 @@ public static class ConfigService
         try
         {
             var json = File.ReadAllText(path);
+
+            // Backward compatibility: older configs stored the list under "Groups".
+            // Rename the key to "Emails" before deserializing so the collection loads.
+            if (JsonNode.Parse(json) is JsonObject root)
+            {
+                if (!root.ContainsKey("Emails") && root["Groups"] is JsonNode legacy)
+                {
+                    root["Emails"] = legacy.DeepClone();
+                    root.Remove("Groups");
+                    json = root.ToJsonString();
+                }
+            }
+
             return JsonSerializer.Deserialize<AppConfig>(json, Options) ?? new AppConfig();
         }
         catch

@@ -67,7 +67,14 @@ public static class ContactsService
             if (string.IsNullOrWhiteSpace(c.Email)) continue;
             if (target.Any(x => string.Equals(x.Email, c.Email, StringComparison.OrdinalIgnoreCase)))
                 continue;
-            target.Add(new Contact { Name = c.Name, Email = c.Email });
+            target.Add(new Contact
+            {
+                Name = c.Name,
+                Email = c.Email,
+                FoundInOutlook = c.FoundInOutlook,
+                LastUsedUtc = c.LastUsedUtc,
+                Aliases = c.Aliases != null ? new List<string>(c.Aliases) : new List<string>()
+            });
             added++;
         }
         return added;

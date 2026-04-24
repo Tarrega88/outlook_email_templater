@@ -26,6 +26,22 @@ dotnet build
 dotnet run --project CavtEmail
 ```
 
+## Publish (for distribution to coworkers)
+
+Multi-file self-contained Windows x64 build. **Not** single-file on purpose — single-file
+bundles extract to a temp folder on first launch on every new machine, which causes a
+noticeable delay. A plain folder launches instantly.
+
+```powershell
+.\scripts\publish.ps1
+```
+
+Output:
+- Folder: `publish\CavtEmail-win-x64\` — ship the whole folder; `CavtEmail.exe` is the entry point.
+- Zip:    `publish\CavtEmail-win-x64.zip` — same content, for handing out.
+
+Pass `-NoZip` to skip the zip step.
+
 ## Variable tokens
 
 Put these anywhere in the **Subject** or **Body**:

@@ -209,6 +209,36 @@
                 <Setter Property="Margin" Value="0,0,4,4"/>
             </Style>
 
+            <!-- Full-width pill shown in place of the recipient TextBox once a row is resolved. -->
+            <Style TargetType="Button" x:Key="RecipientPill" BasedOn="{StaticResource SubtleButton}">
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="MinHeight" Value="28"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="Cursor" Value="IBeam"/>
+                <Setter Property="Background"  Value="#FF1F3759"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderFocus}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="b"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="b" Property="Opacity" Value="0.85"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- To / CC toggle used on recipient rows -->
             <Style TargetType="ToggleButton" x:Key="CcToggle">
                 <Setter Property="MinWidth" Value="34"/>
@@ -248,9 +278,131 @@
                 </Setter>
             </Style>
 
+            <!-- ============================================================
+                 ContextMenu / MenuItem / ToolTip (dark)
+                 ============================================================ -->
+            <Style TargetType="ToolTip">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="Background" Value="{StaticResource CardBg}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="8,5"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="HasDropShadow" Value="False"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToolTip">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter TextBlock.Foreground="{StaticResource TextBrush}"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="ContextMenu">
+                <Setter Property="Background" Value="{StaticResource CardBg}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="Padding" Value="4"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContextMenu">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4" Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="Separator" x:Key="{x:Static MenuItem.SeparatorStyleKey}">
+                <Setter Property="Height" Value="1"/>
+                <Setter Property="Margin" Value="2,4"/>
+                <Setter Property="Background" Value="{StaticResource CardBorder}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Separator">
+                            <Border Height="1" Background="{StaticResource CardBorder}"/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="MenuItem">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="3"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter x:Name="HeaderHost"
+                                                      ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="Arrow" Grid.Column="1"
+                                               Text="▸" Margin="12,0,0,0"
+                                               Foreground="{StaticResource Muted}"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed"/>
+                                    <Popup x:Name="PART_Popup"
+                                           Placement="Right"
+                                           HorizontalOffset="-4"
+                                           IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                           AllowsTransparency="True"
+                                           Focusable="False"
+                                           PopupAnimation="Fade">
+                                        <Border Background="{StaticResource CardBg}"
+                                                BorderBrush="{StaticResource CardBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="4" Padding="4"
+                                                SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="Role" Value="SubmenuHeader">
+                                    <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                                <Trigger Property="Role" Value="TopLevelHeader">
+                                    <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectedBg}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- ComboBox (fully templated so dark colors stick) -->
-            <Style TargetType="ToggleButton" x:Key="ComboToggleButton">
-                <Setter Property="Focusable" Value="False"/>
+            <Style TargetType="ToggleButton" x:Key="ComboToggleButton">                <Setter Property="Focusable" Value="False"/>
                 <Setter Property="ClickMode" Value="Press"/>
                 <Setter Property="Template">
                     <Setter.Value>

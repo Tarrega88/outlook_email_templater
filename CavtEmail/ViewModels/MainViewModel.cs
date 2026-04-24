@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using CavtEmail.Models;
 using CavtEmail.Services;
 using Microsoft.Win32;
@@ -10,9 +11,11 @@ namespace CavtEmail.ViewModels;
 public class MainViewModel : NotifyBase
 {
     private AppConfig _config = new();
-    private EmailGroup? _selectedGroup;
+    private EmailTemplate? _selectedEmail;
     private string _currentConfigPath;
     private string _statusMessage = "";
+    private bool _isOutlookAvailable;
+    private readonly DispatcherTimer _outlookPingTimer;
 
     public MainViewModel()
     {
@@ -23,11 +26,13 @@ public class MainViewModel : NotifyBase
         _config.Contacts = ContactsService.Load();
         MigrateLegacyContacts(_config);
 
-        if (_config.Groups.Count == 0)
+        if (_config.Emails.Count == 0)
         {
-            _config.Groups.Add(new EmailGroup { Name = "Group 1" });
+            _config.Emails.Add(new EmailTemplate { Name = "Email 1" });
         }
-        _selectedGroup = _config.Groups.FirstOrDefault();
+        StampRecipientStates(_config);
+        foreach (var e in _config.Emails) EnsureTrailingBlankRecipient(e);
+        _selectedEmail = _config.Emails.FirstOrDefault();
 
         // First-run: auto-fill the sender display name from Windows / AD.
         if (string.IsNullOrWhiteSpace(_config.SenderName))
@@ -37,37 +42,47 @@ public class MainViewModel : NotifyBase
                                  ?? "";
         }
 
-        AddGroupCommand          = new RelayCommand(AddGroup);
-        RemoveGroupCommand       = new RelayCommand(RemoveGroup, () => SelectedGroup != null);
-        DuplicateGroupCommand    = new RelayCommand(DuplicateGroup, () => SelectedGroup != null);
+        Resolver = new ContactResolver(_config.Contacts, SaveContacts);
 
-        AddRecipientCommand      = new RelayCommand(AddRecipient, () => SelectedGroup != null);
+        AddEmailCommand          = new RelayCommand(AddEmail);
+        RemoveEmailCommand       = new RelayCommand(RemoveEmail, () => SelectedEmail != null);
+        DuplicateEmailCommand    = new RelayCommand(DuplicateEmail, () => SelectedEmail != null);
+
+        AddRecipientCommand      = new RelayCommand(AddRecipient, () => SelectedEmail != null);
         RemoveRecipientCommand   = new RelayCommand(RemoveRecipient);
 
-        AddAttachmentCommand        = new RelayCommand(AddAttachment, () => SelectedGroup != null);
-        AddAttachmentFolderCommand  = new RelayCommand(AddAttachmentFolder, () => SelectedGroup != null);
+        AddAttachmentCommand        = new RelayCommand(AddAttachment, () => SelectedEmail != null);
+        AddAttachmentFolderCommand  = new RelayCommand(AddAttachmentFolder, () => SelectedEmail != null);
         RemoveAttachmentCommand     = new RelayCommand(RemoveAttachment);
 
         SaveCommand              = new RelayCommand(Save);
         SaveAsCommand            = new RelayCommand(SaveAs);
         OpenCommand              = new RelayCommand(Open);
 
-        SendCommand              = new RelayCommand(Send, () => SelectedGroup != null);
-        SendAllCommand           = new RelayCommand(SendAll, () => _config.Groups.Count > 0);
-        PreviewCommand           = new RelayCommand(Preview, () => SelectedGroup != null);
-        ManageContactsCommand    = new RelayCommand(ManageContacts);
+        SendCommand              = new RelayCommand(Send, () => SelectedEmail != null);
+        SendAllCommand           = new RelayCommand(SendAll, () => _config.Emails.Count > 0);
+        PreviewCommand           = new RelayCommand(Preview, () => SelectedEmail != null);
+
+        // Poll Outlook availability for the toolbar indicator. Cheap (process list),
+        // no COM launch. 3s interval keeps the indicator responsive without churn.
+        IsOutlookAvailable = ContactResolver.IsOutlookRunning();
+        _outlookPingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _outlookPingTimer.Tick += (_, _) => IsOutlookAvailable = ContactResolver.IsOutlookRunning();
+        _outlookPingTimer.Start();
     }
 
-    public AppConfig Config { get => _config; set { Set(ref _config, value); Raise(nameof(Groups)); } }
-    public ObservableCollection<EmailGroup> Groups => _config.Groups;
+    public ContactResolver Resolver { get; }
 
-    public EmailGroup? SelectedGroup
+    public AppConfig Config { get => _config; set { Set(ref _config, value); Raise(nameof(Emails)); } }
+    public ObservableCollection<EmailTemplate> Emails => _config.Emails;
+
+    public EmailTemplate? SelectedEmail
     {
-        get => _selectedGroup;
-        set { if (Set(ref _selectedGroup, value)) Raise(nameof(HasSelection)); }
+        get => _selectedEmail;
+        set { if (Set(ref _selectedEmail, value)) Raise(nameof(HasSelection)); }
     }
 
-    public bool HasSelection => _selectedGroup != null;
+    public bool HasSelection => _selectedEmail != null;
 
     public string StatusMessage { get => _statusMessage; set => Set(ref _statusMessage, value); }
 
@@ -75,9 +90,9 @@ public class MainViewModel : NotifyBase
 
     public Array SendModes { get; } = Enum.GetValues(typeof(SendMode));
 
-    public RelayCommand AddGroupCommand { get; }
-    public RelayCommand RemoveGroupCommand { get; }
-    public RelayCommand DuplicateGroupCommand { get; }
+    public RelayCommand AddEmailCommand { get; }
+    public RelayCommand RemoveEmailCommand { get; }
+    public RelayCommand DuplicateEmailCommand { get; }
     public RelayCommand AddRecipientCommand { get; }
     public RelayCommand RemoveRecipientCommand { get; }
     public RelayCommand AddAttachmentCommand { get; }
@@ -89,23 +104,73 @@ public class MainViewModel : NotifyBase
     public RelayCommand SendCommand { get; }
     public RelayCommand SendAllCommand { get; }
     public RelayCommand PreviewCommand { get; }
-    public RelayCommand ManageContactsCommand { get; }
+
+    public bool IsOutlookAvailable
+    {
+        get => _isOutlookAvailable;
+        private set => Set(ref _isOutlookAvailable, value);
+    }
 
     public ObservableCollection<Contact> Contacts => _config.Contacts;
-
-    /// <summary>Add any recipient (name,email) pair that isn't already in the contact book.</summary>
-    public void CaptureContactsFrom(EmailGroup g)
-    {
-        var added = ContactsService.Merge(_config.Contacts,
-            g.Recipients.Select(r => new Contact { Name = r.Name, Email = r.Email }));
-        if (added > 0) SaveContacts();
-    }
 
     /// <summary>Persist the shared contacts file. Safe to call freely.</summary>
     public void SaveContacts()
     {
         try { ContactsService.Save(_config.Contacts); }
         catch (Exception ex) { StatusMessage = "Contacts save failed: " + ex.Message; }
+    }
+
+    /// <summary>
+    /// When a config is loaded, categorize each recipient against the current
+    /// contact cache so the UI shows the right provenance icon (Outlook vs.
+    /// local vs. unverified literal) without forcing a re-resolve.
+    /// </summary>
+    private void StampRecipientStates(AppConfig cfg)
+    {
+        foreach (var e in cfg.Emails)
+        foreach (var r in e.Recipients)
+        {
+            if (string.IsNullOrWhiteSpace(r.Email))
+            {
+                r.State = ResolveState.Empty;
+                r.Query = "";
+                continue;
+            }
+
+            var hit = cfg.Contacts.FirstOrDefault(c =>
+                string.Equals(c.Email, r.Email, StringComparison.OrdinalIgnoreCase));
+            if (hit != null)
+            {
+                r.State = hit.FoundInOutlook
+                    ? ResolveState.ResolvedOutlook
+                    : ResolveState.ResolvedLocal;
+            }
+            else
+            {
+                // Address is only known to this config. Treat as local-but-unverified:
+                // valid email -> Unverified, otherwise Unresolved.
+                r.State = ContactResolver.LooksLikeEmail(r.Email)
+                    ? ResolveState.Unverified
+                    : ResolveState.Unresolved;
+            }
+            r.Query = string.IsNullOrWhiteSpace(r.Name) ? r.Email : r.Name;
+        }
+    }
+
+    /// <summary>
+    /// Ensure <paramref name="e"/> has a trailing blank recipient row so the user
+    /// never has to click "+ Add" just to type the first (or next) address.
+    /// </summary>
+    public void EnsureTrailingBlankRecipient(EmailTemplate? e)
+    {
+        if (e == null) return;
+        var last = e.Recipients.Count == 0 ? null : e.Recipients[^1];
+        if (last == null ||
+            !string.IsNullOrWhiteSpace(last.Name) ||
+            !string.IsNullOrWhiteSpace(last.Email))
+        {
+            e.Recipients.Add(new Recipient { Name = "", Email = "" });
+        }
     }
 
     /// <summary>
@@ -120,37 +185,31 @@ public class MainViewModel : NotifyBase
         if (added > 0) SaveContacts();
     }
 
-    private void ManageContacts()
+    private void AddEmail()
     {
-        var win = new ContactsWindow(_config.Contacts) { Owner = Application.Current.MainWindow };
-        win.ShowDialog();
-        SaveContacts();
+        var e = new EmailTemplate { Name = $"Email {_config.Emails.Count + 1}" };
+        _config.Emails.Add(e);
+        EnsureTrailingBlankRecipient(e);
+        SelectedEmail = e;
     }
 
-    private void AddGroup()
+    private void RemoveEmail()
     {
-        var g = new EmailGroup { Name = $"Group {_config.Groups.Count + 1}" };
-        _config.Groups.Add(g);
-        SelectedGroup = g;
-    }
-
-    private void RemoveGroup()
-    {
-        if (SelectedGroup == null) return;
-        if (MessageBox.Show($"Delete group '{SelectedGroup.Name}'?", "Confirm",
+        if (SelectedEmail == null) return;
+        if (MessageBox.Show($"Delete email '{SelectedEmail.Name}'?", "Confirm",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        var idx = _config.Groups.IndexOf(SelectedGroup);
-        _config.Groups.Remove(SelectedGroup);
-        SelectedGroup = _config.Groups.Count == 0
+        var idx = _config.Emails.IndexOf(SelectedEmail);
+        _config.Emails.Remove(SelectedEmail);
+        SelectedEmail = _config.Emails.Count == 0
             ? null
-            : _config.Groups[Math.Min(idx, _config.Groups.Count - 1)];
+            : _config.Emails[Math.Min(idx, _config.Emails.Count - 1)];
     }
 
-    private void DuplicateGroup()
+    private void DuplicateEmail()
     {
-        if (SelectedGroup == null) return;
-        var src = SelectedGroup;
-        var copy = new EmailGroup
+        if (SelectedEmail == null) return;
+        var src = SelectedEmail;
+        var copy = new EmailTemplate
         {
             Name = src.Name + " (copy)",
             Subject = src.Subject,
@@ -158,24 +217,28 @@ public class MainViewModel : NotifyBase
         };
         foreach (var r in src.Recipients) copy.Recipients.Add(new Recipient { Name = r.Name, Email = r.Email, IsCc = r.IsCc });
         foreach (var a in src.Attachments) copy.Attachments.Add(new AttachmentItem { Path = a.Path });
-        _config.Groups.Add(copy);
-        SelectedGroup = copy;
+        _config.Emails.Add(copy);
+        EnsureTrailingBlankRecipient(copy);
+        SelectedEmail = copy;
     }
 
     private void AddRecipient()
     {
-        SelectedGroup?.Recipients.Add(new Recipient { Name = "", Email = "" });
+        SelectedEmail?.Recipients.Add(new Recipient { Name = "", Email = "" });
     }
 
     private void RemoveRecipient(object? param)
     {
-        if (SelectedGroup != null && param is Recipient r)
-            SelectedGroup.Recipients.Remove(r);
+        if (SelectedEmail != null && param is Recipient r)
+        {
+            SelectedEmail.Recipients.Remove(r);
+            EnsureTrailingBlankRecipient(SelectedEmail);
+        }
     }
 
     private void AddAttachment()
     {
-        if (SelectedGroup == null) return;
+        if (SelectedEmail == null) return;
         var dlg = new OpenFileDialog { Multiselect = true, Title = "Select files to attach" };
         if (dlg.ShowDialog() == true)
         {
@@ -186,7 +249,7 @@ public class MainViewModel : NotifyBase
 
     private void AddAttachmentFolder()
     {
-        if (SelectedGroup == null) return;
+        if (SelectedEmail == null) return;
         var dlg = new OpenFolderDialog
         {
             Title = "Select a folder — its top-level files will be attached at send time",
@@ -201,15 +264,15 @@ public class MainViewModel : NotifyBase
 
     public void AddAttachmentPath(string path)
     {
-        if (SelectedGroup == null || string.IsNullOrWhiteSpace(path)) return;
-        if (SelectedGroup.Attachments.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase))) return;
-        SelectedGroup.Attachments.Add(new AttachmentItem { Path = path });
+        if (SelectedEmail == null || string.IsNullOrWhiteSpace(path)) return;
+        if (SelectedEmail.Attachments.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase))) return;
+        SelectedEmail.Attachments.Add(new AttachmentItem { Path = path });
     }
 
     private void RemoveAttachment(object? param)
     {
-        if (SelectedGroup != null && param is AttachmentItem a)
-            SelectedGroup.Attachments.Remove(a);
+        if (SelectedEmail != null && param is AttachmentItem a)
+            SelectedEmail.Attachments.Remove(a);
     }
 
     private void Save()
@@ -255,9 +318,11 @@ public class MainViewModel : NotifyBase
                 // Preserve the shared contacts list across the swap.
                 cfg.Contacts = _config.Contacts;
                 MigrateLegacyContacts(cfg);
+                StampRecipientStates(cfg);
+                foreach (var e in cfg.Emails) EnsureTrailingBlankRecipient(e);
                 Config = cfg;
                 CurrentConfigPath = dlg.FileName;
-                SelectedGroup = cfg.Groups.FirstOrDefault();
+                SelectedEmail = cfg.Emails.FirstOrDefault();
                 StatusMessage = $"Loaded {dlg.FileName}";
             }
             catch (Exception ex)
@@ -269,28 +334,28 @@ public class MainViewModel : NotifyBase
 
     private void Preview()
     {
-        if (SelectedGroup == null) return;
-        var subject = TemplateEngine.Render(SelectedGroup.Subject, SelectedGroup, _config);
-        var body = TemplateEngine.Render(SelectedGroup.Body, SelectedGroup, _config);
-        var to = string.Join("; ", SelectedGroup.Recipients.Where(r => !r.IsCc).Select(r => r.Email));
-        var cc = string.Join("; ", SelectedGroup.Recipients.Where(r =>  r.IsCc).Select(r => r.Email));
+        if (SelectedEmail == null) return;
+        var subject = TemplateEngine.Render(SelectedEmail.Subject, SelectedEmail, _config);
+        var body = TemplateEngine.Render(SelectedEmail.Body, SelectedEmail, _config);
+        var to = string.Join("; ", SelectedEmail.Recipients.Where(r => !r.IsCc).Select(r => r.Email));
+        var cc = string.Join("; ", SelectedEmail.Recipients.Where(r =>  r.IsCc).Select(r => r.Email));
         var files = string.Join(Environment.NewLine,
-            SelectedGroup.Attachments.SelectMany(a =>
+            SelectedEmail.Attachments.SelectMany(a =>
                 a.IsFolder
                     ? new[] { $" - [folder] {a.Path}" }
                         .Concat(a.ResolveFiles().Select(f => "     • " + f))
                     : new[] { " - " + a.Path }));
         var ccLine = string.IsNullOrWhiteSpace(cc) ? "" : $"Cc: {cc}\r\n";
         var msg = $"To: {to}\r\n{ccLine}Subject: {subject}\r\n\r\nAttachments:\r\n{files}\r\n\r\n---\r\n{body}";
-        MessageBox.Show(msg, "Preview: " + SelectedGroup.Name, MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show(msg, "Preview: " + SelectedEmail.Name, MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Send()
     {
-        if (SelectedGroup == null) return;
-        var g = SelectedGroup;
+        if (SelectedEmail == null) return;
+        var e = SelectedEmail;
 
-        if (!HasAnyToRecipient(g))
+        if (!HasAnyToRecipient(e))
         {
             MessageBox.Show("Add at least one recipient in the To field (uncheck CC on at least one row).",
                 "No recipients",
@@ -298,7 +363,7 @@ public class MainViewModel : NotifyBase
             return;
         }
 
-        var missing = g.Attachments.Where(a => !a.Exists).Select(a => a.Path).ToList();
+        var missing = e.Attachments.Where(a => !a.Exists).Select(a => a.Path).ToList();
         if (missing.Count > 0)
         {
             var list = string.Join(Environment.NewLine, missing);
@@ -307,7 +372,7 @@ public class MainViewModel : NotifyBase
                 return;
         }
 
-        var emptyFolders = g.Attachments
+        var emptyFolders = e.Attachments
             .Where(a => a.IsFolder && !a.ResolveFiles().Any())
             .Select(a => a.Path).ToList();
         if (emptyFolders.Count > 0)
@@ -323,17 +388,17 @@ public class MainViewModel : NotifyBase
         if (mode == SendMode.SendAutomatically)
         {
             var confirm = MessageBox.Show(
-                $"Send email from '{g.Name}' to {g.Recipients.Count} recipient(s) without review?",
+                $"Send email '{e.Name}' to {e.Recipients.Count} recipient(s) without review?",
                 "Confirm auto-send", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
         }
 
         try
         {
-            SendGroupCore(g, mode);
+            SendEmailCore(e, mode);
             StatusMessage = mode == SendMode.SendAutomatically
-                ? $"Sent '{g.Name}' to {g.Recipients.Count} recipient(s)."
-                : $"Opened draft for '{g.Name}' in Outlook.";
+                ? $"Sent '{e.Name}' to {e.Recipients.Count} recipient(s)."
+                : $"Opened draft for '{e.Name}' in Outlook.";
         }
         catch (Exception ex)
         {
@@ -343,42 +408,42 @@ public class MainViewModel : NotifyBase
 
     private void SendAll()
     {
-        if (_config.Groups.Count == 0) return;
+        if (_config.Emails.Count == 0) return;
 
-        var eligible = _config.Groups.Where(HasAnyToRecipient).ToList();
-        var skipped  = _config.Groups.Except(eligible).ToList();
+        var eligible = _config.Emails.Where(HasAnyToRecipient).ToList();
+        var skipped  = _config.Emails.Except(eligible).ToList();
 
         if (eligible.Count == 0)
         {
-            MessageBox.Show("No groups have a To recipient. Add at least one row (not CC-only) to a group.",
+            MessageBox.Show("No emails have a To recipient. Add at least one row (not CC-only) to an email.",
                 "Nothing to send", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var missingByGroup = eligible
-            .Select(g => (g, miss: g.Attachments.Where(a => !a.Exists).Select(a => a.Path).ToList()))
+        var missingByEmail = eligible
+            .Select(e => (e, miss: e.Attachments.Where(a => !a.Exists).Select(a => a.Path).ToList()))
             .Where(x => x.miss.Count > 0)
             .ToList();
 
         var mode = _config.SendMode;
         var verb = mode == SendMode.SendAutomatically ? "Send" : "Open drafts for";
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"{verb} {eligible.Count} group(s):");
-        foreach (var g in eligible)
-            sb.AppendLine($"  • {g.Name}  ({g.Recipients.Count(r => !r.IsCc)} To, {g.Recipients.Count(r => r.IsCc)} Cc, {g.Attachments.Count} files)");
+        sb.AppendLine($"{verb} {eligible.Count} email(s):");
+        foreach (var e in eligible)
+            sb.AppendLine($"  • {e.Name}  ({e.Recipients.Count(r => !r.IsCc)} To, {e.Recipients.Count(r => r.IsCc)} Cc, {e.Attachments.Count} files)");
         if (skipped.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine($"Skipping {skipped.Count} group(s) with no To recipient:");
-            foreach (var g in skipped) sb.AppendLine($"  • {g.Name}");
+            sb.AppendLine($"Skipping {skipped.Count} email(s) with no To recipient:");
+            foreach (var e in skipped) sb.AppendLine($"  • {e.Name}");
         }
-        if (missingByGroup.Count > 0)
+        if (missingByEmail.Count > 0)
         {
             sb.AppendLine();
             sb.AppendLine("Some attachments are missing and will be omitted:");
-            foreach (var (g, miss) in missingByGroup)
+            foreach (var (e, miss) in missingByEmail)
             {
-                sb.AppendLine($"  • {g.Name}:");
+                sb.AppendLine($"  • {e.Name}:");
                 foreach (var p in miss) sb.AppendLine($"      - {p}");
             }
         }
@@ -391,45 +456,45 @@ public class MainViewModel : NotifyBase
 
         int ok = 0;
         var failures = new System.Collections.Generic.List<string>();
-        foreach (var g in eligible)
+        foreach (var e in eligible)
         {
             try
             {
-                SendGroupCore(g, mode);
+                SendEmailCore(e, mode);
                 ok++;
             }
             catch (Exception ex)
             {
-                failures.Add($"{g.Name}: {ex.Message}");
+                failures.Add($"{e.Name}: {ex.Message}");
             }
         }
 
         StatusMessage = mode == SendMode.SendAutomatically
-            ? $"Sent {ok} of {eligible.Count} group(s)."
+            ? $"Sent {ok} of {eligible.Count} email(s)."
             : $"Opened {ok} of {eligible.Count} draft(s) in Outlook.";
 
         if (failures.Count > 0)
         {
             MessageBox.Show(
-                $"{failures.Count} group(s) failed:\r\n\r\n{string.Join(Environment.NewLine, failures)}",
+                $"{failures.Count} email(s) failed:\r\n\r\n{string.Join(Environment.NewLine, failures)}",
                 "Send all — errors", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private static bool HasAnyToRecipient(EmailGroup g) =>
-        g.Recipients.Any(r => !r.IsCc && !string.IsNullOrWhiteSpace(r.Email));
+    private static bool HasAnyToRecipient(EmailTemplate e) =>
+        e.Recipients.Any(r => !r.IsCc && !string.IsNullOrWhiteSpace(r.Email));
 
     /// <summary>
-    /// Renders + sends/drafts a single group. No UI, no validation — caller must check first.
+    /// Renders + sends/drafts a single email. No UI, no validation — caller must check first.
     /// Throws on Outlook errors.
     /// </summary>
-    private void SendGroupCore(EmailGroup g, SendMode mode)
+    private void SendEmailCore(EmailTemplate e, SendMode mode)
     {
-        var subject = TemplateEngine.Render(g.Subject, g, _config);
-        var body = TemplateEngine.Render(g.Body, g, _config);
-        var toEmails = g.Recipients.Where(r => !r.IsCc && !string.IsNullOrWhiteSpace(r.Email)).Select(r => r.Email);
-        var ccEmails = g.Recipients.Where(r =>  r.IsCc && !string.IsNullOrWhiteSpace(r.Email)).Select(r => r.Email);
-        var paths = g.Attachments
+        var subject = TemplateEngine.Render(e.Subject, e, _config);
+        var body = TemplateEngine.Render(e.Body, e, _config);
+        var toEmails = e.Recipients.Where(r => !r.IsCc && !string.IsNullOrWhiteSpace(r.Email)).Select(r => r.Email);
+        var ccEmails = e.Recipients.Where(r =>  r.IsCc && !string.IsNullOrWhiteSpace(r.Email)).Select(r => r.Email);
+        var paths = e.Attachments
             .Where(a => a.Exists)
             .SelectMany(a => a.ResolveFiles())
             .Distinct(StringComparer.OrdinalIgnoreCase);
@@ -437,7 +502,5 @@ public class MainViewModel : NotifyBase
         OutlookService.CreateMail(
             toEmails, ccEmails, subject, body, paths, _config.HtmlBody,
             mode == SendMode.SendAutomatically ? OutlookService.Mode.Send : OutlookService.Mode.Draft);
-
-        CaptureContactsFrom(g);
     }
 }
