@@ -17,6 +17,13 @@ public class MainViewModel : NotifyBase
     private bool _isOutlookAvailable;
     private readonly DispatcherTimer _outlookPingTimer;
 
+    // JSON snapshot of the config as last loaded/saved. The dirty-check timer
+    // re-serializes the live config and compares against this string to flip
+    // IsDirty without us having to wire change-tracking into every model.
+    private string _savedSnapshot = "";
+    private readonly DispatcherTimer _dirtyCheckTimer;
+    private bool _isDirty;
+
     public MainViewModel()
     {
         _currentConfigPath = ConfigService.DefaultPath;
@@ -72,6 +79,30 @@ public class MainViewModel : NotifyBase
         _outlookPingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         _outlookPingTimer.Tick += (_, _) => IsOutlookAvailable = ContactResolver.IsOutlookRunning();
         _outlookPingTimer.Start();
+
+        // Take an initial clean snapshot, then poll for changes for the title-bar
+        // dirty marker. 500ms is plenty responsive for typing without churn.
+        SnapshotSaved();
+        _dirtyCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _dirtyCheckTimer.Tick += (_, _) => RecomputeDirty();
+        _dirtyCheckTimer.Start();
+    }
+
+    private void SnapshotSaved()
+    {
+        try { _savedSnapshot = ConfigService.Serialize(_config); }
+        catch { _savedSnapshot = ""; }
+        IsDirty = false;
+    }
+
+    private void RecomputeDirty()
+    {
+        try
+        {
+            var current = ConfigService.Serialize(_config);
+            IsDirty = !string.Equals(current, _savedSnapshot, StringComparison.Ordinal);
+        }
+        catch { /* ignore — leave IsDirty as-is */ }
     }
 
     public ContactResolver Resolver { get; }
@@ -89,7 +120,34 @@ public class MainViewModel : NotifyBase
 
     public string StatusMessage { get => _statusMessage; set => Set(ref _statusMessage, value); }
 
-    public string CurrentConfigPath { get => _currentConfigPath; set => Set(ref _currentConfigPath, value); }
+    public string CurrentConfigPath
+    {
+        get => _currentConfigPath;
+        set { if (Set(ref _currentConfigPath, value)) Raise(nameof(WindowTitle)); }
+    }
+
+    public bool IsDirty
+    {
+        get => _isDirty;
+        private set { if (Set(ref _isDirty, value)) Raise(nameof(WindowTitle)); }
+    }
+
+    /// <summary>
+    /// Window chrome title: <c>Envoy — &lt;name&gt;</c>, with a trailing <c>*</c>
+    /// when there are unsaved changes. Falls back to <c>Untitled</c> for an
+    /// unsaved/blank config path.
+    /// </summary>
+    public string WindowTitle
+    {
+        get
+        {
+            string name;
+            try { name = Path.GetFileNameWithoutExtension(_currentConfigPath); }
+            catch { name = ""; }
+            if (string.IsNullOrWhiteSpace(name)) name = "Untitled";
+            return $"Envoy \u2014 {name}{(_isDirty ? "*" : "")}";
+        }
+    }
 
     public Array SendModes { get; } = Enum.GetValues(typeof(SendMode));
 
@@ -330,6 +388,7 @@ public class MainViewModel : NotifyBase
         {
             ConfigService.Save(_config, _currentConfigPath);
             StatusMessage = $"Saved to {_currentConfigPath}";
+            SnapshotSaved();
         }
         catch (Exception ex)
         {
@@ -373,6 +432,7 @@ public class MainViewModel : NotifyBase
                 CurrentConfigPath = dlg.FileName;
                 SelectedEmail = cfg.Emails.FirstOrDefault();
                 StatusMessage = $"Loaded {dlg.FileName}";
+                SnapshotSaved();
             }
             catch (Exception ex)
             {

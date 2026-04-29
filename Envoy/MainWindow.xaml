@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:Envoy"
         xmlns:vm="clr-namespace:Envoy.ViewModels"
         xmlns:m="clr-namespace:Envoy.Models"
-        Title="Envoy — File-to-Person Sender" Height="780" Width="1240"
+        Title="{Binding WindowTitle, FallbackValue='Envoy'}" Height="780" Width="1240"
         Background="{StaticResource AppBg}"
         WindowStartupLocation="CenterScreen">
     <Window.DataContext>

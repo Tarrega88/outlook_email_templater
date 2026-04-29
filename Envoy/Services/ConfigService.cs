@@ -50,7 +50,10 @@ public static class ConfigService
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        var json = JsonSerializer.Serialize(config, Options);
+        var json = Serialize(config);
         File.WriteAllText(path, json);
     }
+
+    /// <summary>Stable JSON form of a config — used by the VM to detect unsaved changes.</summary>
+    public static string Serialize(AppConfig config) => JsonSerializer.Serialize(config, Options);
 }
